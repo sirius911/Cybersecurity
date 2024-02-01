@@ -112,6 +112,8 @@ def spider(url, recursion_depth, download_path, base_domain, visited_urls, downl
         print(f"Error in request : {e}")
         
 if __name__ == "__main__":
+    downloaded_img = set()
+    visited_urls = set()
     parser = argparse.ArgumentParser(description="Spider program to extract images from a website.")
     parser.add_argument("url", help="URL of the website")
     parser.add_argument("-r", action="store_true", help="Recursively download images")
@@ -124,6 +126,9 @@ if __name__ == "__main__":
     print(f"base_domaine = {base_domain}")
     config_download_path(args.p)
     if args.r:
-        spider(args.url, args.l, args.p, base_domain, set(), set())
+        spider(args.url, args.l, args.p, base_domain, visited_urls, downloaded_img)
     else:
-        extract_images_from_page(args.url, args.p, base_domain, set())
+        extract_images_from_page(args.url, args.p, downloaded_img)
+    print(f"downloaded images #= {len(downloaded_img)}")
+    if len(visited_urls):
+        print(f"visited links #= {len(visited_urls)}")
