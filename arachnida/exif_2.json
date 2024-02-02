@@ -1,0 +1,21 @@
+{
+    "0th": {
+        "Make": "Canon",
+        "Model": "Canon EOS 80D",
+        "Software": "Adobe Photoshop 21.1 (Windows)",
+        "DateTime": "2020:08:01 12:01:02",
+        "Artist": "Cyrille LORIN"
+    },
+    "Exif": {
+        "ExposureTime": "1/500",
+        "ISOSpeedRatings": 100,
+        "DateTimeOriginal": "2020:08:01 12:01:02",
+        "ShutterSpeedValue": "287/32",
+        "ApertureValue": "327/32",
+        "ExposureBiasValue": "0/1",
+        "MaxApertureValue": "4/1",
+        "MeteringMode": 5,
+        "Flash": 16,
+        "FocalLength": "55/1"
+    }
+}

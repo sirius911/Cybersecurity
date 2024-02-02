@@ -1,0 +1,161 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import os
+import json
+import argparse
+import tkinter as tk
+from PIL import Image, ImageTk
+from PIL.ExifTags import TAGS
+import piexif
+
+def find_tag(dict, groupe, name):
+    if groupe in dict:
+        for tag, valeur in dict[groupe].items():
+            if valeur['name'] == name:
+                return tag
+    return None
+
+
+def valid_json_file(file_path):
+    if not file_path.endswith('.json'):
+        print("Error: with --exif option the file must be a JSON file")
+        return False
+    try:
+        with open(file_path, 'r') as file:
+            json.load(file)
+        return True
+    except json.JSONDecodeError:
+        print("Error : JSON file not Valid")
+        return False
+
+def convert_to_rational(value):
+    if isinstance(value, str) and '/' in value:
+        numerator, denominator = value.split('/')
+        return (int(numerator), int(denominator))
+    elif isinstance(value, int):
+        return (value, 1)
+    return value
+
+
+def write_exif_to_image(json_path, image_paths):
+    with open(json_path, 'r') as file:
+        new_exif_data = json.load(file)
+    for image_path in image_paths:
+        print(f"writing in {image_path} ... ", end='')
+        try:
+            exif_dict = piexif.load(image_path)
+            for ifd_name in new_exif_data:
+                for tag_name, tag_value in new_exif_data[ifd_name].items():
+                    tag = find_tag(piexif.TAGS, ifd_name, tag_name)
+                    converted_value = convert_to_rational(tag_value)
+                    exif_dict[ifd_name][tag] = converted_value
+            #clear empty Exif
+            empty_ifds = [ifd for ifd in exif_dict if not exif_dict[ifd] or exif_dict[ifd] is None]
+            for ifd in empty_ifds:
+                del exif_dict[ifd]
+            exif_bytes = piexif.dump(exif_dict)
+            piexif.insert(exif_bytes, image_path)
+            print("✅")
+        except Exception as e:
+            print(f"❌ Error : {e}")
+
+def extract_metadata(file_path):
+    try:
+        with Image.open(file_path) as img:
+            exif_dict = piexif.load(file_path)
+
+            exif_data = {}
+            for ifd in exif_dict:
+                if ifd == "thumbnail":
+                    continue  # Ignorer les données de la miniature
+                for tag, value in exif_dict[ifd].items():
+                    tag_name = piexif.TAGS[ifd][tag]["name"]
+                    if isinstance(value, bytes):
+                        value = value.decode(errors="ignore")
+                    elif isinstance(value, tuple):
+                        if len(value) == 2:
+                            value = str(value[0]) + '/' + str(value[1])
+                        else:
+                            value = ', '.join(str(v) for v in value)
+                    exif_data[tag_name] = value
+            return exif_data
+
+    except IOError:
+        return {'error': 'Cannot open file or unsupported file format'}
+
+class ImageViewer:
+    def __init__(self, master, file_paths):
+        self.master = master
+        self.master.title("Scorpion: Image Viewer")
+
+        self.file_paths = file_paths
+        self.current_index = 0
+
+        self.img_label = tk.Label(master)
+        self.img_label.pack()
+
+        self.metadata_label = tk.Label(master, justify=tk.LEFT)
+        self.metadata_label.pack(side="bottom", fill="both", expand="yes")
+
+        self.prev_button = tk.Button(master, text="<< Previous", command=self.show_previous_image)
+        self.prev_button.pack(side="left")
+
+        self.next_button = tk.Button(master, text="Next >>", command=self.show_next_image)
+        self.next_button.pack(side="right")
+
+        self.update_image_and_metadata()
+
+    def show_previous_image(self):
+        if self.current_index > 0:
+            self.current_index -= 1
+            self.update_image_and_metadata()
+
+    def show_next_image(self):
+        if self.current_index < len(self.file_paths) - 1:
+            self.current_index += 1
+            self.update_image_and_metadata()
+
+    def update_image_and_metadata(self):
+        file_path = self.file_paths[self.current_index]
+        try:
+            img = Image.open(file_path)
+            img = self.resize_image(img, max_size=(800, 600))
+            imgTk = ImageTk.PhotoImage(img)
+            self.img_label.configure(image=imgTk)
+            self.img_label.image = imgTk
+
+            metadata = extract_metadata(file_path)
+            text = "\n".join([f"{key}: {value}" for key, value in metadata.items()])
+            self.metadata_label.configure(text=text)
+        except Exception as e:
+            self.img_label.configure(image='')
+            self.img_label.image = None
+            self.metadata_label.configure(text=f"Erreur : {e}")
+
+        self.master.title(f"Image Viewer - {os.path.basename(file_path)}")
+        self.prev_button['state'] = tk.NORMAL if self.current_index > 0 else tk.DISABLED
+        self.next_button['state'] = tk.NORMAL if self.current_index < len(self.file_paths) - 1 else tk.DISABLED
+
+    @staticmethod
+    def resize_image(image, max_size):
+        ratio = min(max_size[0] / image.width, max_size[1] / image.height)
+        new_size = (int(image.width * ratio), int(image.height * ratio))
+        return image.resize(new_size, Image.Resampling.LANCZOS)
+
+def main():
+    parser = argparse.ArgumentParser(description='Scorpion: Image Viewer with Metadata')
+    parser.add_argument('-e', '--exif', help='Path to JSON file with metadata')
+    parser.add_argument('files', nargs='+', help='Image files to process')
+    args = parser.parse_args()
+
+    if args.exif and not valid_json_file(args.exif):
+        exit(1)
+    if args.exif:
+        write_exif_to_image(args.exif, args.files)
+    root = tk.Tk()
+    ImageViewer(root, args.files)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
