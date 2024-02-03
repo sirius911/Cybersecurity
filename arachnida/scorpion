@@ -10,6 +10,21 @@ from PIL.ExifTags import TAGS
 import piexif
 
 def find_tag(dict, groupe, name):
+    """
+    Searches for a tag within a given group in the provided dictionary.
+
+    This function iterates through the tags in a specified group within the dictionary. 
+    It returns the tag if it finds a tag with a name matching the provided name. 
+    If no matching tag is found, it returns None.
+
+    Args:
+        dict (dict): The dictionary containing groups of tags.
+        group (str): The group within the dictionary to search for the tag.
+        name (str): The name of the tag to find.
+
+    Returns:
+        The tag if found, or None if no matching tag is found.
+    """
     if groupe in dict:
         for tag, valeur in dict[groupe].items():
             if valeur['name'] == name:
@@ -18,6 +33,19 @@ def find_tag(dict, groupe, name):
 
 
 def valid_json_file(file_path):
+    """
+    Validates whether the provided file path points to a valid JSON file.
+
+    This function checks if the file at the specified path has a '.json' extension and whether its 
+    contents are valid JSON. It prints an error message if the file is not a JSON file or if the 
+    JSON content is invalid.
+
+    Args:
+        file_path (str): The file system path of the JSON file to validate.
+
+    Returns:
+        bool: True if the file is a valid JSON file, False otherwise.
+    """
     if not file_path.endswith('.json'):
         print("Error: with --exif option the file must be a JSON file")
         return False
@@ -30,6 +58,21 @@ def valid_json_file(file_path):
         return False
 
 def convert_to_rational(value):
+    """
+    Converts a given value to a rational number represented as a tuple.
+
+    This function handles three types of inputs: 
+    1. A string representing a fraction (e.g., "3/4"), which it converts into a tuple of two integers (numerator, denominator).
+    2. An integer, which it converts to a tuple representing the integer as a fraction with a denominator of 1.
+    3. Any other type of value is returned as-is.
+
+    Args:
+        value (int or str): The value to be converted into a rational number.
+
+    Returns:
+        tuple or original type: A tuple representing the rational number if the input is a string fraction or an integer; 
+                                otherwise, the original value is returned.
+    """
     if isinstance(value, str) and '/' in value:
         numerator, denominator = value.split('/')
         return (int(numerator), int(denominator))
@@ -39,6 +82,20 @@ def convert_to_rational(value):
 
 
 def write_exif_to_image(json_path, image_paths):
+    """
+    Writes EXIF data to a list of image files based on the JSON file provided.
+
+    The function reads EXIF data from a JSON file and applies this data to a list of image files. 
+    It handles different EXIF tags and converts values to the appropriate format before writing them 
+    to the images. If any image cannot be processed, an error message is printed. 
+
+    Args:
+        json_path (str): The file path of the JSON file containing the EXIF data.
+        image_paths (list of str): A list of file paths for the images to which the EXIF data will be written.
+
+    Returns:
+        None
+    """
     with open(json_path, 'r') as file:
         new_exif_data = json.load(file)
     for image_path in image_paths:
@@ -48,6 +105,8 @@ def write_exif_to_image(json_path, image_paths):
             for ifd_name in new_exif_data:
                 for tag_name, tag_value in new_exif_data[ifd_name].items():
                     tag = find_tag(piexif.TAGS, ifd_name, tag_name)
+                    if tag is None:
+                        break
                     converted_value = convert_to_rational(tag_value)
                     exif_dict[ifd_name][tag] = converted_value
             #clear empty Exif
@@ -61,10 +120,22 @@ def write_exif_to_image(json_path, image_paths):
             print(f"❌ Error : {e}")
 
 def extract_metadata(file_path):
+    """
+    Extracts the EXIF metadata from an image file.
+
+    This function opens an image file and extracts its EXIF data. The EXIF data is formatted into a 
+    readable dictionary, converting byte and tuple values to strings. Thumbnail data is ignored. 
+    If the image file cannot be opened or is in an unsupported format, an error message is returned.
+
+    Args:
+        file_path (str): The file path of the image from which to extract EXIF metadata.
+
+    Returns:
+        dict: A dictionary containing the EXIF metadata, or an error message if the file cannot be opened or processed.
+    """
     try:
         with Image.open(file_path) as img:
             exif_dict = piexif.load(file_path)
-
             exif_data = {}
             for ifd in exif_dict:
                 if ifd == "thumbnail":
@@ -85,7 +156,29 @@ def extract_metadata(file_path):
         return {'error': 'Cannot open file or unsupported file format'}
 
 class ImageViewer:
+    """
+    A simple image viewer application using Tkinter.
+
+    This class creates a window to display images along with their metadata. It allows the user to navigate
+    through a list of images using previous and next buttons. 
+
+    Attributes:
+        master (Tk): The master Tkinter widget.
+        file_paths (list of str): A list of file paths for the images to be displayed.
+        current_index (int): The current index in the file_paths list.
+        img_label (Tk Label): Label widget to display the image.
+        metadata_label (Tk Label): Label widget to display the image's metadata.
+        prev_button (Tk Button): Button to navigate to the previous image.
+        next_button (Tk Button): Button to navigate to the next image.
+    """
     def __init__(self, master, file_paths):
+        """
+        Initializes the ImageViewer with a master widget and a list of image file paths.
+
+        Args:
+            master (Tk): The master Tkinter widget.
+            file_paths (list of str): A list of file paths for the images to be displayed.
+        """
         self.master = master
         self.master.title("Scorpion: Image Viewer")
 
@@ -107,31 +200,55 @@ class ImageViewer:
         self.update_image_and_metadata()
 
     def show_previous_image(self):
+        """
+        Displays the previous image in the list, along with its metadata.
+
+        Decrements the current index and updates the image and metadata displayed. 
+        This function is disabled if the current image is the first in the list.
+        """
         if self.current_index > 0:
             self.current_index -= 1
             self.update_image_and_metadata()
 
     def show_next_image(self):
+        """
+        Displays the next image in the list, along with its metadata.
+
+        Increments the current index and updates the image and metadata displayed. 
+        This function is disabled if the current image is the last in the list.
+        """
         if self.current_index < len(self.file_paths) - 1:
             self.current_index += 1
             self.update_image_and_metadata()
 
     def update_image_and_metadata(self):
+        """
+        Updates the image and metadata displayed in the ImageViewer.
+
+        This function loads the image and its metadata for the current index, and updates
+        the img_label and metadata_label widgets. It also updates the window title with the 
+        current image name and adjusts the state of the navigation buttons.
+        """
         file_path = self.file_paths[self.current_index]
         try:
             img = Image.open(file_path)
+            img_format = img.format
             img = self.resize_image(img, max_size=(800, 600))
             imgTk = ImageTk.PhotoImage(img)
             self.img_label.configure(image=imgTk)
             self.img_label.image = imgTk
 
-            metadata = extract_metadata(file_path)
-            text = "\n".join([f"{key}: {value}" for key, value in metadata.items()])
+            if img_format in ['JPEG', 'TIFF']:
+                metadata = extract_metadata(file_path)
+                text = "\n".join([f"{key}: {value}" for key, value in metadata.items()])
+            else:
+                text = "No EXIF data available for this image format."
+
             self.metadata_label.configure(text=text)
         except Exception as e:
             self.img_label.configure(image='')
             self.img_label.image = None
-            self.metadata_label.configure(text=f"Erreur : {e}")
+            self.metadata_label.configure(text=f"Error : {e}")
 
         self.master.title(f"Image Viewer - {os.path.basename(file_path)}")
         self.prev_button['state'] = tk.NORMAL if self.current_index > 0 else tk.DISABLED
@@ -139,6 +256,16 @@ class ImageViewer:
 
     @staticmethod
     def resize_image(image, max_size):
+        """
+        Resizes an image to fit within a maximum width and height, maintaining aspect ratio.
+
+        Args:
+            image (PIL Image): The image to be resized.
+            max_size (tuple of int): The maximum width and height for the image.
+
+        Returns:
+            PIL Image: The resized image.
+        """
         ratio = min(max_size[0] / image.width, max_size[1] / image.height)
         new_size = (int(image.width * ratio), int(image.height * ratio))
         return image.resize(new_size, Image.Resampling.LANCZOS)

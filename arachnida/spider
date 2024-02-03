@@ -20,10 +20,35 @@ def config_download_path(download_path):
         os.makedirs(download_path)
 
 def is_valid_image_url(url):
+    """
+    Checks if the provided URL is valid for an image.
+    This function modifies the URL's scheme to 'http', and then checks if the URL starts with 'http'. 
+    This ensures that the URL is properly formatted for an image on the web.
+
+    Args:
+        url (str): The URL of the image to check.
+
+    Returns:
+        bool: True if the URL is valid for an image, False otherwise.
+    """
     url_with_http_scheme = urlparse(url)._replace(scheme='http').geturl()
     return url_with_http_scheme.startswith('http')
 
 def download_image(url, path):
+    """
+    Downloads an image from a given URL and saves it to the specified path.
+
+    This function attempts to download an image from the provided URL. If the download is successful 
+    (HTTP status code 200), the image is saved to the given path. If the download fails, it prints 
+    an error message. The function also prints a progress indicator (✅ for success, ❌ for failure).
+
+    Args:
+        url (str): The URL of the image to download.
+        path (str): The file system path where the image should be saved.
+
+    Returns:
+        None
+    """
     print(f"\t[{url[:50]}] ... ", end='')
     try:
         response = requests.get(url)
@@ -37,6 +62,21 @@ def download_image(url, path):
         print(f"❌ : {e}")
 
 def extract_images_from_page(url, path, downloaded_img):
+    """
+    Extracts and downloads images from a given webpage URL.
+
+    This function fetches the contents of the webpage at the specified URL. It then parses the HTML 
+    content to find all image tags (<img> and <picture>). For each image, it constructs the full image URL 
+    and downloads the image to the specified path, avoiding re-downloading images already downloaded.
+
+    Args:
+        url (str): The URL of the webpage from which to extract images.
+        path (str): The local file system path where the images should be saved.
+        downloaded_img (set): A set to keep track of images already downloaded.
+
+    Returns:
+        None
+    """
     echo(f"Extract from {url} : ",underline=True, fg="blue",nl = False)
     try:
         response = requests.get(url)
@@ -70,6 +110,24 @@ def extract_images_from_page(url, path, downloaded_img):
         print(f"Error in request : {e}")
 
 def spider(url, recursion_depth, download_path, base_domain, visited_urls, downloaded_img):
+    """
+    Recursively crawls a website from the given URL to a specified depth, downloading images.
+
+    This function visits a URL, downloads images from that page, and follows the links on the page to 
+    other pages within the same domain, up to the specified recursion depth. It avoids visiting the same 
+    URL more than once and only downloads images from the base domain.
+
+    Args:
+        url (str): The starting URL for the spider to crawl.
+        recursion_depth (int): The maximum depth of recursion for visiting links.
+        download_path (str): The directory path where images will be downloaded.
+        base_domain (str): The base domain from which images should be downloaded.
+        visited_urls (set): A set to keep track of URLs already visited.
+        downloaded_img (set): A set to keep track of images already downloaded.
+
+    Returns:
+        None
+    """
     if recursion_depth == 0 or url in visited_urls:
         return
     visited_urls.add(urljoin(base_domain, url))
