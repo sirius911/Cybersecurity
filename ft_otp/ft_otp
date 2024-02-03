@@ -1,0 +1,173 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import sys
+import os
+import argparse
+import random
+from time import time
+from cryptography.fernet import Fernet
+import hmac
+import hashlib
+from colorama import Fore, Style
+
+FERNET_PATH = "fernet.key"
+
+def valid_key(key:str) -> bool:
+    """
+    Check if the given key is a valid hexadecimal string of at least 64 characters.
+
+    Args:
+    key (str): The string to be checked for validity as a hexadecimal key.
+
+    Returns:
+    bool: True if the key is a valid hexadecimal string of at least 64 characters, False otherwise.
+    """
+    hex_digits = set("0123456789abcdefABCDEF")
+    return all(char in hex_digits for char in key) and len(key)>= 64
+
+
+def load_fernet_key() -> Fernet:
+    try:
+        with open(FERNET_PATH, "rb") as file:
+            fernet_key = file.read()
+        return Fernet(fernet_key)
+    except Exception as e:
+        print(f"{Fore.RED}Error with {FERNET_PATH} : {Style.RESET_ALL}{e}")
+        sys.exit(1)
+
+def decrypt_key(encrypted_key) -> bytes:
+    fernet = load_fernet_key()
+    try:
+        decrypt_key = fernet.decrypt(encrypted_key.encode())
+        return decrypt_key
+    except:
+        print(f"{Fore.RED}Error: Bad encrypted file.{Style.RESET_ALL}")
+        sys.exit(1)
+
+def create_fernet_key():
+    output_path = FERNET_PATH
+    fernet_key = Fernet.generate_key()
+    if os.path.isfile(output_path):
+        os.remove(output_path)
+    with open(output_path, "wb+") as file:
+        file.write(fernet_key)
+    os.chmod(output_path, 0o400)
+    return fernet_key
+
+def create_key(arg:str):
+    try:
+        if os.path.isfile(arg):
+            with open(arg, 'r') as file:
+                key = file.read()
+        else:
+            key = arg
+    except:
+        print(f"Failed to read the key file{Style.RESET_ALL}")
+        sys.exit(1)
+
+    if valid_key(key):
+        output_path = "ft_otp.key"
+        fernet = Fernet(key=create_fernet_key())
+        encrypted_key = fernet.encrypt(key.encode())
+        if os.path.isfile(output_path):
+            os.remove(output_path)
+        with open(output_path, "wb") as f:
+            f.write(encrypted_key)
+        os.chmod(output_path, 0o400)
+        print(f"Key was successfully saved in {Fore.BLUE}{output_path}{Style.RESET_ALL}")
+    else:
+        print(f"{Fore.RED}Error: The key must be at least 64 hexadecimal characters long{Style.RESET_ALL}")
+
+def create_otp_direct(key: bytes, counter: int) -> str:
+
+    # Convertir le compteur en bytes (8 bytes, big-endian)
+    counter_bytes = counter.to_bytes(8, byteorder="big")
+
+    # Créer un objet HMAC utilisant la clé, le compteur et SHA1
+    hmac_hash = hmac.new(key, counter_bytes, hashlib.sha1)
+
+    # Obtenir le digest du HMAC
+    digest = hmac_hash.digest()
+
+    # Déterminer l'offset à partir du dernier byte du hash
+    offset = digest[-1] & 0x0F
+
+    # Extraire 4 bytes à partir de l'offset
+    part = digest[offset:offset+4]
+
+    # Convertir ces bytes en un entier en utilisant l'ordre des octets big-endian
+    code = int.from_bytes(part, byteorder='big')
+
+    # Appliquer un masque pour ne garder que les 31 bits de droite
+    code &= 0x7FFFFFFF
+
+    # Réduire le code à un nombre à 6 chiffres
+    code %= 10**6
+
+    # Convertir en chaîne de caractères, remplie avec des zéros si nécessaire
+    hotp_code = str(code).zfill(6)
+
+    return hotp_code
+
+def create_otp(arg:str) -> str:
+    try:
+        with open(arg, 'r') as file:
+            encrypted_key = file.read()
+    except:
+        print(f"{Fore.RED}Failed to read the key file{Style.RESET_ALL}")
+        sys.exit(1) 
+    
+    decrypted_key = decrypt_key(encrypted_key)
+    counter = int(time() / 30)
+    return create_otp_direct(decrypted_key, counter)
+
+def init_hex64(length: int = 64, filename:str ="key.hex"):
+    """
+    Generates a hexadecimal string of a specified length and writes it to a file.
+
+    Args:
+    length (int): The length of the hexadecimal string to be generated.
+    filename (str): The name of the file to which the hexadecimal key will be written.
+                    Default is 'key.hex'.
+
+    Returns:
+    None
+    """
+    hex_chars = '0123456789abcdef'
+    hex_key = ''.join(random.choice(hex_chars) for _ in range(length))
+
+    with open(filename, 'w') as file:
+        file.write(hex_key)
+
+def testing_hotp():
+    """
+        Testing https://www.ietf.org/rfc/rfc4226.txt
+    """
+    valid_hotp = [755224, 287082, 359152, 969429, 338314, 254676, 287922, 162583, 399871, 520489]
+
+    print(f"Running {Fore.YELLOW}RFC4226{Style.RESET_ALL} tests")
+    secret = "3132333435363738393031323334353637383930"
+    secret_bytes = bytes.fromhex(secret)
+    for i in range(0, 10):
+        provided_hotp = create_otp_direct(secret_bytes, i)
+        print(f"{provided_hotp}:{'✅' if int(provided_hotp) == valid_hotp[i] else '❌'}")
+
+    exit(0)
+
+if __name__ == "__main__":
+    # init_hex64()
+    if len(sys.argv) == 2 and sys.argv[1] == "test":
+        testing_hotp()
+        
+    parser = argparse.ArgumentParser(description="ft_opt : generating one-time password.")
+    parser.add_argument("-g", type=str, metavar="HEX_KEY", help="create a new key from a 64 bytes hexadecimal file")
+    parser.add_argument("-k", type=str, metavar="KEY_FILE", help="file containing the key.")
+    args = parser.parse_args()
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+    if args.g:
+        create_key(args.g)
+    elif args.k:
+        print(create_otp(args.k))
