@@ -10,8 +10,34 @@ from cryptography.fernet import Fernet
 import hmac
 import hashlib
 from colorama import Fore, Style
+import glob
 
 FERNET_PATH = "fernet.key"
+
+def delete_files(pattern):
+    """
+    Deletes files matching a specified pattern in the current directory.
+
+    This function searches for files in the current directory that match the given pattern
+    (e.g., "*.hex" for all hex files, "*.key" for all key files) using the `glob` module.
+    Each matching file is then deleted using the `os.remove` method. If a file is successfully 
+    deleted, a confirmation message is printed. If an error occurs during deletion (e.g., file 
+    not found, permission issues), an error message is printed.
+
+    Args:
+    pattern (str): A pattern string used to match files. This should follow Unix shell-style 
+                   wildcards. For example, '*.txt' matches all text files.
+
+    Returns:
+    None: This function does not return anything. It either deletes files and prints 
+          confirmation messages or catches and prints exceptions if any occur.
+    """
+    for file in glob.glob(pattern):
+        try:
+            os.remove(file)
+            print(f"File {Fore.YELLOW}{file}{Style.RESET_ALL} has been deleted.")
+        except OSError as e:
+            print(f"{Fore.RED}Error:{Style.RESET_ALL} {e}")
 
 def valid_key(key:str) -> bool:
     """
@@ -28,6 +54,21 @@ def valid_key(key:str) -> bool:
 
 
 def load_fernet_key() -> Fernet:
+    """
+    Loads the Fernet key from a specified file path.
+
+    This function attempts to open a file located at `FERNET_PATH` to read the Fernet key. 
+    If successful, it returns a Fernet object initialized with the key. 
+    In case of an error (e.g., file not found, access denied, etc.), 
+    it prints the error message and exits the program.
+
+    Returns:
+    Fernet: A Fernet object initialized with the key read from the file.
+
+    Raises:
+    SystemExit: If the file specified in `FERNET_PATH` cannot be read or if there's 
+                any issue with the key file, the program will exit with an error message.
+    """
     try:
         with open(FERNET_PATH, "rb") as file:
             fernet_key = file.read()
@@ -37,6 +78,25 @@ def load_fernet_key() -> Fernet:
         sys.exit(1)
 
 def decrypt_key(encrypted_key) -> bytes:
+    """
+    Decrypts an encrypted key using the Fernet symmetric encryption.
+
+    This function first loads a Fernet key using the `load_fernet_key` function. 
+    It then attempts to decrypt the provided `encrypted_key`. The encrypted key 
+    should be a string that is correctly formatted for Fernet's decryption method.
+    In case of a successful decryption, the decrypted key (in bytes) is returned.
+    If the decryption fails, an error message is printed and the program exits.
+
+    Args:
+    encrypted_key (str): The encrypted key as a string, to be decrypted using Fernet.
+
+    Returns:
+    bytes: The decrypted key in bytes.
+
+    Raises:
+    SystemExit: If the decryption process fails due to a bad encrypted key or other issues,
+                the program will exit with an error message.
+    """
     fernet = load_fernet_key()
     try:
         decrypt_key = fernet.decrypt(encrypted_key.encode())
@@ -46,6 +106,18 @@ def decrypt_key(encrypted_key) -> bytes:
         sys.exit(1)
 
 def create_fernet_key():
+    """
+    Generates and stores a new Fernet key.
+
+    This function generates a new Fernet key using the Fernet library's `generate_key` method.
+    The generated key is then written to a file specified by `FERNET_PATH`.
+    If a file already exists at this path, it is removed before writing the new key.
+    The permissions of the key file are set to read-only for the owner (0o400) for security purposes.
+    Finally, the function returns the generated Fernet key.
+
+    Returns:
+    bytes: The generated Fernet key.
+    """
     output_path = FERNET_PATH
     fernet_key = Fernet.generate_key()
     if os.path.isfile(output_path):
@@ -56,6 +128,30 @@ def create_fernet_key():
     return fernet_key
 
 def create_key(arg:str):
+    """
+    Creates and securely stores an encrypted key.
+
+    This function takes an argument `arg` which can either be a file path or a key string.
+    If `arg` is a file path, the function attempts to read the key from the file.
+    If `arg` is a key string, it uses `arg` as the key directly.
+    The key is then validated using the `valid_key` function.
+    If the key is valid, a new Fernet key is generated using `create_fernet_key`,
+    and the original key is encrypted with this Fernet key.
+    The encrypted key is then written to a file named 'ft_otp.key'.
+    If this file already exists, it is overwritten.
+    The permissions of the output file are set to read-only for the owner (0o400).
+    If the key is not valid, an error message is displayed.
+
+    Args:
+    arg (str): A file path to a key file or a key string.
+
+    Returns:
+    None
+
+    Raises:
+    SystemExit: If the function fails to read the key from the file, or if the provided key is invalid,
+                the program exits with an appropriate error message.
+    """
     try:
         if os.path.isfile(arg):
             with open(arg, 'r') as file:
@@ -111,6 +207,29 @@ def create_otp_direct(key: bytes, counter: int) -> str:
     return hotp_code
 
 def create_otp(arg:str) -> str:
+    """
+    Generates a one-time password (OTP) using HMAC-based One-Time Password (HOTP) algorithm.
+
+    This function takes a secret key and a counter value to generate a 6-digit OTP.
+    It uses HMAC (Hash-based Message Authentication Code) with the SHA1 hashing algorithm.
+    The process involves several steps:
+        1. Convert the counter to 8 bytes (big-endian).
+        2. Create an HMAC object using the key, counter bytes, and SHA1.
+        3. Compute the HMAC digest.
+        4. Determine the offset from the last byte of the digest.
+        5. Extract a 4-byte slice from the digest at the determined offset.
+        6. Convert these bytes to an integer (big-endian).
+        7. Apply a mask to keep only the rightmost 31 bits.
+        8. Reduce the integer to a 6-digit code.
+        9. Format the code as a zero-padded string.
+
+    Args:
+    key (bytes): The secret key used for the HMAC generation.
+    counter (int): The counter value, which changes for each OTP generation.
+
+    Returns:
+    str: A 6-digit one-time password as a string.
+    """
     try:
         with open(arg, 'r') as file:
             encrypted_key = file.read()
@@ -122,7 +241,7 @@ def create_otp(arg:str) -> str:
     counter = int(time() / 30)
     return create_otp_direct(decrypted_key, counter)
 
-def init_hex64(length: int = 64, filename:str ="key.hex"):
+def init_hex(length: int = 64, filename:str ="key.hex"):
     """
     Generates a hexadecimal string of a specified length and writes it to a file.
 
@@ -136,9 +255,17 @@ def init_hex64(length: int = 64, filename:str ="key.hex"):
     """
     hex_chars = '0123456789abcdef'
     hex_key = ''.join(random.choice(hex_chars) for _ in range(length))
-
-    with open(filename, 'w') as file:
-        file.write(hex_key)
+    if isinstance(filename,str):
+        if os.path.exists(filename):
+            overwrite = input(f"The file {filename} already exists. Do you want to overwrite it? (yes/no): ")
+            if overwrite.lower() != 'yes':
+                print("Operation cancelled.")
+                return
+        with open(filename, 'w') as file:
+            file.write(hex_key)
+        print(f"{Fore.BLUE}{filename}{Style.RESET_ALL} was created.")
+    else:
+        print(f"key = {Fore.YELLOW}{hex_key}{Style.RESET_ALL}")
 
 def testing_hotp():
     """
@@ -155,15 +282,26 @@ def testing_hotp():
 
     exit(0)
 
+def cleaning():
+    confirm = input(f"Are you sure to delete the files ? (yes/no): ")
+    if confirm.lower() != 'yes':
+        print("Operation cancelled.")
+        return
+
+    delete_files("*.hex")
+    delete_files("*.key")
+
 if __name__ == "__main__":
-    # init_hex64()
-    if len(sys.argv) == 2 and sys.argv[1] == "test":
-        testing_hotp()
-        
     parser = argparse.ArgumentParser(description="ft_opt : generating one-time password.")
-    parser.add_argument("-g", type=str, metavar="HEX_KEY", help="create a new key from a 64 bytes hexadecimal file")
-    parser.add_argument("-k", type=str, metavar="KEY_FILE", help="file containing the key.")
+    group1 = parser.add_mutually_exclusive_group()
+    group2 = parser.add_mutually_exclusive_group()
+    group1.add_argument("-g", type=str, metavar="HEX_KEY", help="create a new key from a 64 bytes hexadecimal file")
+    group1.add_argument("-k", type=str, metavar="KEY_FILE", help="file containing the key.")
+    group2.add_argument("-t","--test", action='store_true', help="Running RFC4226 Test.")
+    group2.add_argument("-i", "--init", type=str, nargs='?', const=True, metavar="FILENAME", help="Generates a 64 hexadecimal string")
+    group2.add_argument("--delete", action='store_true', help="Delete all *.key and *.hex files")
     args = parser.parse_args()
+    print(args)
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -171,3 +309,10 @@ if __name__ == "__main__":
         create_key(args.g)
     elif args.k:
         print(create_otp(args.k))
+    elif args.test:
+        testing_hotp()
+    elif args.init:
+        init_hex(length=64, filename=args.init)
+    elif args.delete:
+        cleaning()
+
