@@ -1,0 +1,36 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+from colorama import Fore, Style
+
+# Définition des adresses
+base_address = 0x10000
+target_address = 0x00011476
+source_address = 0x1131b
+source_address_offset = source_address - base_address
+opcode = 0xe9
+# Taille de l'instruction JMP
+jmp_instruction_size = 5
+
+# Calcul du décalage pour le JMP
+jmp_offset = target_address - (source_address + jmp_instruction_size)
+
+# Conversion du décalage en octets (little endian)
+jmp_offset_bytes = jmp_offset.to_bytes(4, byteorder='little', signed=True)
+
+# Convertir jmp_offset_bytes en une représentation string comme le patch
+jmp_offset_bytes_str = ' '.join([f"{byte:02x}" for byte in jmp_offset_bytes])
+
+# Concaténer l'opcode JMP avec le décalage pour obtenir la représentation complète
+jmp_instruction_str = f"{opcode:02x} {jmp_offset_bytes_str}"
+print(f"\t******************************************")
+print(f"\t*     {Fore.CYAN}Calcul du décalage pour le jmp{Style.RESET_ALL}     *")
+print(f"\t******************************************")
+print(f"\t Ecriture du patch [SA]      : {Fore.BLUE}0x{source_address:07x}{Style.RESET_ALL}")
+print(f"\t Adresse visée [TA]          : {Fore.BLUE}0x{target_address:07x}{Style.RESET_ALL}")
+print(f"\t Opcode [{Fore.YELLOW}JMP{Style.RESET_ALL}]                : {Fore.BLUE}{opcode:02x}{Style.RESET_ALL}")
+print(f"\t Taille Instruction [JMP]    : {Fore.BLUE}{jmp_instruction_size}{Style.RESET_ALL} byte(s)")
+print(f"\t Décalage -> TA - (SA + JMP) : {Fore.BLUE}0x{jmp_offset:07x}{Style.RESET_ALL}")
+print(f"\t Conversion little endian    : {Fore.BLUE}{' '.join([f'{byte:02x}' for byte in jmp_offset_bytes])}{Style.RESET_ALL}")
+print(f"\t Instruction JMP complète    : {Fore.GREEN}{jmp_instruction_str}{Style.RESET_ALL}")
+print(f"\t------------------------------------------------------------\n")

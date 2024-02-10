@@ -1,0 +1,112 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import os
+import json
+import sys
+from colorama import Fore, Style
+
+def verify_files(binary_path, json_path):
+    """
+    Verifies the existence of the specified binary and JSON files.
+    
+    Args:
+        binary_path (str): Path to the binary file that needs to be verified.
+        json_path (str): Path to the JSON file containing patch information that needs to be verified.
+        
+    Raises:
+        FileNotFoundError: If either the binary file or the JSON file does not exist.
+    """
+    if not os.path.isfile(binary_path):
+        raise FileNotFoundError(f"'{Fore.YELLOW}{binary_path}{Style.RESET_ALL}' does'nt exist.")
+    if not os.path.isfile(json_path):
+        raise FileNotFoundError(f"'{Fore.YELLOW}{json_path}{Style.RESET_ALL}' does'nt exist.")
+
+def load_json_patches(json_path):
+    """
+    Loads and returns the patches information from a specified JSON file.
+
+    Args:
+        json_path (str): Path to the JSON file from which to load the patches.
+
+    Returns:
+        dict: The dictionary containing the patches information loaded from the JSON file.
+
+    Raises:
+        Exception: If there is an issue opening or reading the JSON file, prints an error message and exits the program.
+    """
+    try:
+        with open(json_path, 'r') as json_file:
+            return json.load(json_file)
+    except Exception as e:
+        print(f"{Fore.RED}Error JSON{Style.RESET_ALL} : {e}")
+        sys.exit(1)
+
+def apply_patches(binary_path, patches):
+    """
+    Applies patches to the binary file based on the information provided in a patches dictionary.
+    The patches are applied relative to a base address, and the patched binary is saved with a specified extension in the current working directory.
+
+    Args:
+        binary_path (str): The path to the binary file to be patched.
+        patches_info (dict): A dictionary containing the base address, extension for the patched file, 
+                             and a list of patches. Each patch includes an offset (relative to the base address), 
+                             a description, and the binary data (as a hex string) to write.
+
+    The function iterates over each patch, calculates the actual offset by subtracting the base address, 
+    applies the binary data patch, and then saves the patched binary with the new extension. It also prints out 
+    detailed information about each patch applied, including the patch number, offset, description, and the 
+    before/after state of the binary data around the patch location.
+
+    The patched binary is saved in the current working directory with its original name plus the specified extension.
+    Permissions are set to allow reading, writing, and execution by the owner, and reading and execution by others.
+    """
+    ba = patches_info['base_address']
+    base_address = int(patches_info['base_address'], 16) if ba else 0
+    extension = patches_info['extension']
+    patches = patches_info['patches']
+
+    with open(binary_path, 'rb') as f:
+        data = bytearray(f.read())
+    
+    for i, patch_info in enumerate(patches):
+        offset = int(patch_info['offset'], 16) - base_address
+        description = patch_info['description']
+        patch_data = bytes.fromhex(patch_info['data'].replace(" ", ""))
+        
+        print(f"\t{Fore.BLUE}patch #{i}{Style.RESET_ALL}: 0x{offset:05x} -> {description} ({len(patch_data)} bytes)")
+
+        # Appliquer le patch
+        data_before = data[:offset]
+        data_after = data[offset+len(patch_data):]
+        data = data_before + patch_data + data_after
+
+        print(f"\t\t└> {data_before.hex()[-25:]}", end=" ")
+        print(f"{Fore.YELLOW}{patch_data.hex()}{Style.RESET_ALL}", end=" ")
+        print(f"{data_after.hex()[:25]}")
+
+    # Sauvegarder le binaire patché
+    binary_name = os.path.basename(binary_path)
+    new_binary_path = os.path.join(os.getcwd(), binary_name + extension)
+    with open(new_binary_path, 'wb') as f:
+        f.write(data)
+    
+    print(f"Patched binary saved to {Fore.BLUE}{new_binary_path}{Style.RESET_ALL}")
+    os.chmod(new_binary_path, 0o755)
+    print(f"Fixing permissions...{Fore.GREEN}Ok{Style.RESET_ALL}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Apply binary patches from a JSON file.")
+    parser.add_argument("binary_path", help="Path to the binary file to patch.")
+    parser.add_argument("json_path", help="Path to the JSON file containing patch information.")
+    
+    args = parser.parse_args()
+    try:
+        verify_files(args.binary_path, args.json_path)
+        patches_info = load_json_patches(args.json_path)
+        apply_patches(args.binary_path, patches_info)
+    except Exception as e:
+        print(f"{Fore.RED}Error{Style.RESET_ALL} : {e}")
+        sys.exit(1)
