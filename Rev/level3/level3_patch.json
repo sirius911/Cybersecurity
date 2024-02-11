@@ -1,41 +1,11 @@
 {
-    "base_address": "",
+    "base_address": "0x100000",
     "extension": "_patched",
     "patches": [
         {
-            "offset": "0x02004",
-            "description": "secret text",
-            "data": "34322c207468652062657374207363686f6f6c20696e2074686520776f726c6421 00 00 00 00 00 00 00"
-        },
-        {
-            "offset": "0x01304",
-            "description": "puts offset",
-            "data": "48 8d 3d f9 0c 00 00"
-        },
-        {
-            "offset": "0x01352",
-            "description": "MOV EAX, 0xFF to cmp success",
-            "data": "b8 ff 00 00 00"
-        },
-        {
-            "offset": "0x01360",
-            "description": "scanf return",
-            "data": "e8 9b ff ff ff"
-        },
-        {
-            "offset": "0x01365",
-            "description": "set exit code to 0 for exit syscall",
-            "data": "bf 2a 00 00 00"
-        },
-        {
-            "offset": "0x0136a",
-            "description": "move syscall id (231)",
-            "data": "b8 e7 00 00 00"
-        },
-        {
-            "offset": "0x0136f",
-            "description": "syscall",
-            "data": "0f 05"
+            "offset": "0x0010135a",
+            "description": "Patch -> JMP good",
+            "data": "e9 ff 01 00 00"
         }
     ]
 }

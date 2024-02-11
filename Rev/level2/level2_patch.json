@@ -3,7 +3,7 @@
     "extension": "_patched",
     "patches": [
         {
-            "offset": "0x1131b",
+            "offset": "0x0001131b",
             "description": "Patch to jump to 'ok'in main 0x00011476",
             "data": "e9 56 01 00 00"
         }

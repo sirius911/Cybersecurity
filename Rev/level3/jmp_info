@@ -4,9 +4,9 @@
 from colorama import Fore, Style
 
 # Définition des adresses
-base_address = 0x10000
-source_address = 0x0001131b    # where patch is writing
-target_address = 0x00011476    # where we will jump
+base_address = 0x0
+source_address = 0x0010135a   # where patch is writing
+target_address = 0x0010155e    # where we will jump
 source_address_offset = source_address - base_address
 opcode = 0xe9
 # Taille de l'instruction JMP
