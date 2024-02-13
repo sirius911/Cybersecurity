@@ -1,13 +1,11 @@
+.PHONY: onion
 # Définition des variables par défaut
 IMAGE_NAME := ft_onion
 CONTAINER_NAME := ft_onion_container
 
 # Commande pour construire l'image Docker
 build:
-	@read -p "Enter username: " username; \
-	read -s -p "Enter password: " password; \
-	echo "\n"; \
-	docker build --build-arg USER_NAME=$$username --build-arg USER_PASS=$$password -t $(IMAGE_NAME) .
+	@./build.sh $(IMAGE_NAME)
 
 # Commande pour lancer le conteneur Docker
 run:
@@ -21,4 +19,6 @@ onion:
 clean:
 	-docker stop $(CONTAINER_NAME)
 	-docker rm $(CONTAINER_NAME)
-	-ssh-keygen -f "/Users/$(USER)/.ssh/known_hosts" -R "[localhost]:4242"
+	-docker rmi $(IMAGE_NAME)
+#-ssh-keygen -f "/Users/$(USER)/.ssh/known_hosts" -R "[localhost]:4242"
+
