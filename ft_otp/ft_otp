@@ -301,7 +301,6 @@ if __name__ == "__main__":
     group2.add_argument("-i", "--init", type=str, nargs='?', const=True, metavar="FILENAME", help="Generates a 64 hexadecimal string")
     group2.add_argument("--delete", action='store_true', help="Delete all *.key and *.hex files")
     args = parser.parse_args()
-    print(args)
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
