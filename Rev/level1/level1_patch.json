@@ -3,12 +3,12 @@
     "extension": "_patched",
     "patches": [
         {
-            "offset": "0x11241",
+            "offset": "0x00011241",
             "description": "Patch CMP EAX,0x0 -> MOV EAX,0x0",
             "data": "B8 00 00 00 00"
         },
         {
-            "offset": "0x11246",
+            "offset": "0x00011246",
             "description": "Patch drop Jnz -> NOP",
             "data": "90 90 90 90"
         }
