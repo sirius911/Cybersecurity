@@ -1,0 +1,45 @@
+#!/usr/bin/expect
+
+set timeout 20
+
+# Démarre la session FTP et se connecte au serveur
+spawn ftp ftp_server 21
+
+# Attend la demande de nom d'utilisateur et envoie le nom d'utilisateur
+expect "Name*:"
+send "client\r"
+
+# Attend la demande de mot de passe et envoie le mot de passe
+expect "Password:"
+send "password\r"
+
+# Attend que la connexion soit établie et exécute les opérations
+expect "ftp>"
+send "ls\r"
+expect "ftp>"
+send "cd upload\r"
+expect "ftp>"
+send "put upload.txt\r"
+expect "ftp>"
+send "cd ..\r"
+expect "ftp>"
+sleep 4
+
+send "cd upload\r"
+expect "ftp>"
+send "put upload1.txt\r"
+expect "ftp>"
+send "cd ..\r"
+expect "ftp>"
+sleep 4
+
+send "get README.md\r"
+expect "ftp>"
+
+sleep 2
+
+# Envoie la commande pour quitter la session FTP
+send "bye\r"
+
+# Attend la fin de la session FTP
+expect eof

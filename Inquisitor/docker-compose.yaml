@@ -1,0 +1,35 @@
+version: '3.7'
+
+services:
+  ftp_server:
+    container_name: ftp_container
+    build:
+      context: ./server
+    ports:
+      - "2020-2021:20-21"  # Map both ports 20 and 21 inside the container to 2020 and 2021 on the host
+      - "21100-21110:21100-21110"  # Exposer la plage de ports passifs
+    networks:
+      - app_network
+
+  ftp_client:
+    container_name: client_container
+    build:
+      context: ./client
+    depends_on:
+      - ftp_server
+    networks:
+      - app_network
+
+  inquisitor:
+    container_name: inquisitor_container
+    build:
+      context: ./inquisitor
+    depends_on:
+      - ftp_server
+      - ftp_client
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge

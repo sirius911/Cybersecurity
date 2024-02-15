@@ -1,0 +1,60 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import docker
+from colorama import Fore, Style
+
+def get_info(container_name):
+    client = docker.from_env()
+    containers = client.containers.list(filters={"name": container_name})
+    ret = {}
+    if containers:
+        container = containers[0]  # Prendre le premier conteneur qui correspond au filtre
+        container_id = container.id
+        container_inspect = client.api.inspect_container(container_id)
+        network_name = list(container_inspect["NetworkSettings"]["Networks"].keys())[0]
+        ip_address = container_inspect["NetworkSettings"]["Networks"][network_name]["IPAddress"]
+        mac_address = container_inspect["NetworkSettings"]["Networks"][network_name]["MacAddress"]
+
+        # Exécuter la commande arp -a dans le conteneur
+        arp_table_result = container.exec_run("arp -a", tty=True)
+        arp_table = 0
+        if arp_table_result.exit_code == 0:
+            arp_table = arp_table_result.output.decode('utf-8')
+        else:
+            arp_table = "Failed to get ARP table"
+        ret = {"ip": ip_address, "mac": mac_address, "arp": arp_table}
+    return ret
+
+def get_args_to_inquisitor(container_src, container_target):
+    ret = ""
+    info_src = get_info(container_src)
+    info_target = get_info(container_target)
+    
+    if info_src and info_target:
+        ret += f"--src-ip {info_src['ip']} --src-mac \"{info_src['mac']}\" --target-ip {info_target['ip']} --target-mac \"{info_target['mac']}\""
+    return ret     
+
+def show_container(container_name):
+    info = get_info(container_name)
+    print( "----------------------------------------------------------------")
+    print(f"-         {Fore.GREEN}{container_name}{Style.RESET_ALL}")
+    print( "----------------------------------------------------------------")
+    if info:
+        print(f"\t- IP Address  : {info['ip']}")
+        print(f"\t- MAC Address : {info['mac']}")
+        print(f"\t- ARP Table   : {info['arp']}")
+    else:
+        print(f"\t\t NO CONTAINER")
+    print( "----------------------------------------------------------------")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Give information about dockers.")
+    parser.add_argument("-i", "--info", action="store_true", help="Show info.")
+    args = parser.parse_args()
+    if args.info:
+        show_container("ftp_container")
+        show_container("client_container")
+        show_container("inquisitor_container")
+    print(get_args_to_inquisitor("ftp_container", "client_container"))
