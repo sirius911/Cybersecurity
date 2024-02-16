@@ -25,7 +25,7 @@ def get_info(container_name):
             arp_output = arp_table_result.output.decode('utf-8').strip()
             # Utilisation d'expressions régulières pour extraire uniquement les adresses IP et MAC
             arp_entries = re.findall(r'\(([\d\.]+)\) at ([\w:]+)', arp_output)
-            formatted_arp_table = "\n".join(["IP: {}\n                : MAC: {}".format(ip, mac) for ip, mac in arp_entries])
+            formatted_arp_table = "\n".join(["\n                : IP: {}\n                : MAC: {}".format(ip, mac) for ip, mac in arp_entries])
         else:
             formatted_arp_table = f"{Fore.RED}Error {arp_table_result.exit_code}{Style.RESET_ALL}"
         ret = {

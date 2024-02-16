@@ -1,6 +1,9 @@
 # Base image
 FROM python:3.8-slim
 
+# Update package list and install dependencies
+RUN apt-get update && apt-get install -y procps && rm -rf /var/lib/apt/lists/*
+
 # Set the working directory in the container
 WORKDIR /app
 

@@ -1,8 +1,6 @@
-build: ## Start
-	@ docker compose -f docker-compose.yaml up --build
 
 inquisitor: ## Run the inquisitor
-	@ docker exec -it inquisitor_container ./inquisitor $(shell utils/get_args)
+	-@ docker exec -it inquisitor_container ./inquisitor $(shell utils/get_args)
 
 status: ## Show the status of the containers
 	@ docker ps
@@ -28,4 +26,13 @@ ftp: ## lien shell
 info:
 	python utils/get_args --info
 
-.PHONY: client inquisitor build simule_client logs
+stop_inquisitor:
+	@docker exec inquisitor_container pkill -f 'python3 ./inquisitor'
+
+build:
+	docker-compose build --no-cache
+
+fclean:  down ## Clean and prune the docker system
+	@ docker system prune -af
+
+.PHONY: client inquisitor build simule_client logs stop_inquisitor 
