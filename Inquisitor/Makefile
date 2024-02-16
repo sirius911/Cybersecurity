@@ -1,5 +1,5 @@
 build: ## Start
-	@ docker compose -f docker-compose.yaml up -d
+	@ docker compose -f docker-compose.yaml up --build
 
 inquisitor: ## Run the inquisitor
 	@ docker exec -it inquisitor_container ./inquisitor $(shell utils/get_args)
@@ -11,12 +11,21 @@ down: ## Stop
 	@ docker compose -f docker-compose.yaml down
 
 logs: ## Show the logs
-	@ docker compose -f docker-compose.yaml logs
+	@ docker exec -it ftp_container cat /var/log/vsftpd.log
 
-reload: ## Reload
-	@ docker compose -f docker-compose.yaml up --build
+up: ## up
+	@ docker compose -f docker-compose.yaml up
 
-client: ## Client demo
+simule_client: ## simulation client
 	@ docker exec -it client_container /usr/local/bin/script.exp
 
-.PHONY: client inquisitor
+client: ## lien shell
+	@ docker exec -it client_container sh
+
+ftp: ## lien shell
+	@ docker exec -it ftp_container sh 
+
+info:
+	python utils/get_args --info
+
+.PHONY: client inquisitor build simule_client logs

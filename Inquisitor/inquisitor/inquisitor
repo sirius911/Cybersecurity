@@ -15,6 +15,7 @@ TARGET_MAC = None
 RUNNING = True
 DELAY = 2
 INTERFACE = "eth0"
+VERBOSE = False
 
 def is_valid_ip(ip):
     # Regex pour valider une adresse IPv4
@@ -78,9 +79,11 @@ if __name__ == "__main__":
     parser.add_argument("--src-mac", required=True, help="Source MAC address")
     parser.add_argument("--target-ip", required=True, help="Target IP address")
     parser.add_argument("--target-mac", required=True, help="Target MAC address")
+    parser.add_argument("-v", "--verbose", action="store_true", default=False , help= "Verbose Mode.")
 
     args = parser.parse_args()
     SRC_IP, SRC_MAC, TARGET_IP, TARGET_MAC = valid_args(args)
+    VERBOSE = args.verbose
     if any(var is None for var in [SRC_IP, SRC_MAC, TARGET_IP, TARGET_MAC]):
         print("Invalid arguments")
         sys.exit(1)

@@ -16,27 +16,31 @@ send "password\r"
 # Attend que la connexion soit établie et exécute les opérations
 expect "ftp>"
 send "ls\r"
+
 expect "ftp>"
-send "cd upload\r"
+send "put /home/upload.txt upload.txt\r"
+
 expect "ftp>"
-send "put upload.txt\r"
-expect "ftp>"
-send "cd ..\r"
+send "ls\r"
+
 expect "ftp>"
 sleep 4
 
-send "cd upload\r"
+send "put nofile.txt\r"
 expect "ftp>"
-send "put upload1.txt\r"
+
+send "ls\r"
 expect "ftp>"
-send "cd ..\r"
-expect "ftp>"
+
 sleep 4
 
 send "get README.md\r"
 expect "ftp>"
 
 sleep 2
+
+send "ls\r"
+expect "ftp>"
 
 # Envoie la commande pour quitter la session FTP
 send "bye\r"

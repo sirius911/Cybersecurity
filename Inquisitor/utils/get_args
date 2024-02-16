@@ -4,6 +4,7 @@
 import argparse
 import docker
 from colorama import Fore, Style
+import re
 
 def get_info(container_name):
     client = docker.from_env()
@@ -19,12 +20,19 @@ def get_info(container_name):
 
         # Exécuter la commande arp -a dans le conteneur
         arp_table_result = container.exec_run("arp -a", tty=True)
-        arp_table = 0
         if arp_table_result.exit_code == 0:
-            arp_table = arp_table_result.output.decode('utf-8')
+            # Formatage de la sortie ARP pour la rendre plus lisible
+            arp_output = arp_table_result.output.decode('utf-8').strip()
+            # Utilisation d'expressions régulières pour extraire uniquement les adresses IP et MAC
+            arp_entries = re.findall(r'\(([\d\.]+)\) at ([\w:]+)', arp_output)
+            formatted_arp_table = "\n".join(["IP: {}\n                : MAC: {}".format(ip, mac) for ip, mac in arp_entries])
         else:
-            arp_table = "Failed to get ARP table"
-        ret = {"ip": ip_address, "mac": mac_address, "arp": arp_table}
+            formatted_arp_table = f"{Fore.RED}Error {arp_table_result.exit_code}{Style.RESET_ALL}"
+        ret = {
+            "ip": ip_address, 
+            "mac": mac_address, 
+            "arp": formatted_arp_table
+        }
     return ret
 
 def get_args_to_inquisitor(container_src, container_target):
@@ -38,16 +46,16 @@ def get_args_to_inquisitor(container_src, container_target):
 
 def show_container(container_name):
     info = get_info(container_name)
-    print( "----------------------------------------------------------------")
+    print( "----------------------------------")
     print(f"-         {Fore.GREEN}{container_name}{Style.RESET_ALL}")
-    print( "----------------------------------------------------------------")
+    print( "----------------------------------")
     if info:
-        print(f"\t- IP Address  : {info['ip']}")
-        print(f"\t- MAC Address : {info['mac']}")
-        print(f"\t- ARP Table   : {info['arp']}")
+        print(f"  - IP Address  : {info['ip']}")
+        print(f"  - MAC Address : {info['mac']}")
+        print(f"  - ARP Table   : {info['arp']}")
     else:
         print(f"\t\t NO CONTAINER")
-    print( "----------------------------------------------------------------")
+    print( "----------------------------------")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Give information about dockers.")
@@ -57,4 +65,5 @@ if __name__ == "__main__":
         show_container("ftp_container")
         show_container("client_container")
         show_container("inquisitor_container")
-    print(get_args_to_inquisitor("ftp_container", "client_container"))
+    else:
+        print(get_args_to_inquisitor("ftp_container", "client_container"))
