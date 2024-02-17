@@ -124,7 +124,8 @@ def ecran():
     print ("  _| |_| | | | (_| | |_| | \__ \ | || (_) | |   ")
     print (" |_____|_| |_|\__, |\__,_|_|___/_|\__\___/|_|   ")
     print ("                 | |                            ")
-    print (f"                 |_|       {Fore.GREEN}{VERSION}{Style.RESET_ALL}\n")
+    print(f"  {f'{Fore.LIGHTGREEN_EX}Verbose{Style.RESET_ALL}' if VERBOSE else ''}               |_|       {Fore.GREEN}{VERSION}{Style.RESET_ALL}\n")
+
 
 
 
