@@ -197,6 +197,11 @@ def encrypt():
             nb_file += 1
         except PermissionError:
             output("❌ Permission denied")
+        except FileNotFoundError:
+            output("❌ File not found")
+        except Exception as e:
+            output(f"❌ : {e}")
+
     if SILENT:
         with open("key.txt", 'w') as file:
             file.write(key)
